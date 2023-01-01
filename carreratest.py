@@ -1,6 +1,6 @@
-from lib2to3.pgen2 import driver
-from threading import Timer
 from carreralib import ControlUnit
+from colorama import Fore, Back, Style
+import os
 cu = ControlUnit('/dev/serial0')
 
 print("gestartet")
@@ -42,7 +42,7 @@ class Driver:
             print("Runde: " + str(self.lap))
             print("Total: " + str(self.total_time)) """
 
-            print("Fahrer: " + str(self.position_info[0]) + ", Zeit: " + str(self.position_info[1]) + " Runden: " + str(self.position_info[2]))
+            print("Fahrer: " + str(self.position_info[0]) + ", Runden: " + str(self.position_info[1]) + " Zeit: " + str(self.position_info[2]))
 
 class RMS:
     def __init__(self):
@@ -51,8 +51,10 @@ class RMS:
         self.times = [0, 0, 0]
         self.zeiten = [0, 0, 0]
         self.zeiten_sortiert = []
+        self.ergebnis = []
         self.not_first_round = False
         self.first = -1
+
 
 drivers = [Driver(i) for i in range(0, 3)]
 
@@ -78,6 +80,7 @@ def position():
         reihung = 1
         for x in rms.zeiten_sortiert:
             drivers[x[0]].position = reihung
+            rms.ergebnis[x] = drivers[x[0]].name
             reihung += 1
 
     rms.not_first_round = True
@@ -86,12 +89,15 @@ while True:
     data = cu.request()
 
     if isinstance(data, ControlUnit.Timer):
+        os.system('clear')
+        
         address = data.address
         drivers[address].zeit(data)
 
         position()
         print("zeiten:" + str(rms.zeiten))
         print("sortiert:" + str(rms.zeiten_sortiert))
+        print("sortiert:" + str(rms.ergebnis))
         
         for i in range(0, 3):
             print("Position " + str(i) + ": " + str(drivers[i].position))
