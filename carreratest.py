@@ -1,6 +1,10 @@
 from carreralib import ControlUnit
 from colorama import Fore, Back, Style
 import os
+import keyboard
+import curses
+from curses import wrapper
+
 cu = ControlUnit('/dev/serial0')
 
 print("gestartet")
@@ -26,7 +30,7 @@ class Driver:
         if self.timestamp_old > 0:
             self.lap_time = (self.timestamp_new - self.timestamp_old) / 1000
 
-            if self.bestlap > 0 and self.lap_time < self.bestlap:
+            if self.bestlap == 0 or self.lap_time < self.bestlap:
                 self.bestlap = self.lap_time
 
             self.lap += 1
@@ -42,7 +46,7 @@ class Driver:
             print("Runde: " + str(self.lap))
             print("Total: " + str(self.total_time)) """
 
-            print("Fahrer: " + str(self.position_info[0]) + ", Runden: " + str(self.position_info[1]) + " Zeit: " + str(self.position_info[2]))
+            #print("Fahrer: " + str(self.position_info[0]) + ", Runden: " + str(self.position_info[1]) + " Zeit: " + str(self.position_info[2]))
 
 class RMS:
     def __init__(self):
@@ -51,15 +55,16 @@ class RMS:
         self.times = [0, 0, 0]
         self.zeiten = [0, 0, 0]
         self.zeiten_sortiert = []
-        self.ergebnis = []
+        self.ergebnis = [0, 0, 0]
         self.not_first_round = False
         self.first = -1
+    
 
 
 drivers = [Driver(i) for i in range(0, 3)]
 
 # Festlegen der Namen der Fahrer
-drivers[0].name = "Rot"
+drivers[0].name = "Rot "
 drivers[1].name = "Gelb"
 drivers[2].name = "Blau"
 
@@ -78,15 +83,16 @@ def position():
         rms.zeiten_sortiert = sorted(rms.zeiten_sortiert, key = lambda item: (item[1]*-1, item[2]))
         
         reihung = 1
-        for x in rms.zeiten_sortiert:
-            drivers[x[0]].position = reihung
-            rms.ergebnis[x] = drivers[x[0]].name
+        for fahrer_stand in rms.zeiten_sortiert:
+            fahrer_index = fahrer_stand[0]
+            drivers[fahrer_index].position = reihung
+            rms.ergebnis[reihung -1] = drivers[fahrer_index].name
             reihung += 1
 
     rms.not_first_round = True
 
-while True:
-    data = cu.request()
+while False:
+    data = cu.poll()
 
     if isinstance(data, ControlUnit.Timer):
         os.system('clear')
@@ -95,12 +101,105 @@ while True:
         drivers[address].zeit(data)
 
         position()
-        print("zeiten:" + str(rms.zeiten))
-        print("sortiert:" + str(rms.zeiten_sortiert))
-        print("sortiert:" + str(rms.ergebnis))
+        #print("zeiten:" + str(rms.zeiten))
+        # print("sortiert:" + str(rms.zeiten_sortiert))
+        # print("ergebnis: " + str(rms.ergebnis))
+        #print("sortiert:" + str(rms.ergebnis))
         
-        for i in range(0, 3):
-            print("Position " + str(i) + ": " + str(drivers[i].position))
+        #for i in range(0, 3):
+            #print("Position " + str(i) + ": " + str(drivers[i].position))
         #print("Runden:" + str(rms.laps))
         #print("Runden:" + str(rms.times))
         #print("Fuehrender:" + str(rms.first))
+
+        auto_symbol = "o=o/"
+        vorhandene_zeiten = len(rms.zeiten_sortiert)
+        
+        if vorhandene_zeiten > 0:
+            print (Back.WHITE +      "         Runde: " + str(rms.zeiten_sortiert[0][1]) + "                            ")
+            print (Style.RESET_ALL + "_____________________________________________")
+            for i in range(vorhandene_zeiten):
+                platz = str(i + 1) + ": "
+                farbe = (Fore.RED, Fore.YELLOW, Fore.BLUE)
+                farbe = farbe[rms.zeiten_sortiert[i][0]]
+                
+                if i == 0:
+                    zeit_block = str(rms.zeiten_sortiert[i][2])
+                else:
+                    if rms.zeiten_sortiert[i][1] == rms.zeiten_sortiert[0][1]:
+                        diff_zeit = rms.zeiten_sortiert[0][2] - rms.zeiten_sortiert[i][2]
+                        zeit_block = "+ " + str(round(diff_zeit, 2)) + "sec"
+                    else:
+                        diff_lap = rms.zeiten_sortiert[0][1] - rms.zeiten_sortiert[i][1]
+                        zeit_block = "+ " + str(diff_lap) + " lap"
+                print (farbe + platz + auto_symbol + "               " + zeit_block)
+
+            print ("")
+            print (Fore.WHITE + "_____________________________________________")
+            print ("Runden:     " + str(str(round(rms.zeiten_sortiert[0][1], 2))))
+            print ("Gesamtzeit: " + str(str(round(rms.zeiten_sortiert[0][2], 2))))
+            print ("_____________________________________________")
+
+            print ("Fahrer        Fastest Lap       Rounds")
+            for driver in drivers:
+                if driver.lap > 0:
+                    print(driver.name + "              " + f'{round(driver.bestlap, 2):.2f}' + "             " + str(driver.lap))
+        else:
+            print (Back.WHITE +      "         Runde: 0 - Rennen gestartet!        ")
+            print (Style.RESET_ALL + "_____________________________________________")
+
+
+def daten_auslesen ():
+    data = cu.poll()
+
+    if isinstance(data, ControlUnit.Timer):
+        os.system('clear')
+        
+        address = data.address
+        drivers[address].zeit(data)
+
+        position()
+
+def main(stdscr):
+    stdscr.clear()
+    stdscr.nodelay(True)
+    stdscr.addstr("hallo")
+
+    while True:
+        daten_auslesen()
+        
+        if len(rms.zeiten_sortiert) > 0:
+            stdscr.clear()
+            position = 1
+
+            row_zeiten = 2
+
+            stdscr.addstr(row_zeiten, 3, "Pos.")
+            stdscr.addstr(row_zeiten, 8, "Driver")
+            stdscr.addstr(row_zeiten, 14, "Lap")
+            stdscr.addstr(row_zeiten, 20, "Time")
+            
+            for zeiten in rms.zeiten_sortiert:
+                fahrer = drivers[zeiten[0]].name
+                runden = zeiten[1]
+                gesamtzeit = round(zeiten[2], 2)
+                stdscr.addstr(row_zeiten + position, 4, f"{position}")
+                stdscr.addstr(row_zeiten + position, 8, f"{fahrer}")
+                stdscr.addstr(row_zeiten + position, 15, f"{runden}")
+                stdscr.addstr(row_zeiten + position, 20, f"{gesamtzeit}")
+                position += 1
+            stdscr.refresh()
+            
+
+        try:
+            key = stdscr.getkey()
+        except:
+            key = None
+        
+        if key == "s":
+            cu.start()
+        elif key == "q":
+            quit()
+
+
+wrapper(main)
