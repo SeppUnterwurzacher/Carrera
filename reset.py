@@ -4,3 +4,5 @@ cu = ControlUnit('/dev/serial0')
 
 cu.reset()
 #cu.start()
+def test():
+    pass

@@ -1,10 +1,8 @@
 from carreralib import ControlUnit
-from colorama import Fore, Back, Style
 import os
-import keyboard
 import curses
 from curses import wrapper
-
+from reset import test
 cu = ControlUnit('/dev/serial0')
 
 print("gestartet")
@@ -40,13 +38,16 @@ class Driver:
 
             self.total_time = self.total_time + self.lap_time
             self.position_info = (self.address, self.lap, self.total_time)
-        
-            """ print("Driver: " + str(self.address) + " - " + self.name)
-            print("Rundenzeit: " + str(self.lap_time))
-            print("Runde: " + str(self.lap))
-            print("Total: " + str(self.total_time)) """
+    
+    def reset(self):
+        self.timestamp_new = 0
+        self.lap_time = 0
+        self.total_time = 0
+        self.lap = 0
+        self.bestlap = 0
+        self.position_info = 0
+        self.position = 0
 
-            #print("Fahrer: " + str(self.position_info[0]) + ", Runden: " + str(self.position_info[1]) + " Zeit: " + str(self.position_info[2]))
 
 class RMS:
     def __init__(self):
@@ -64,9 +65,9 @@ class RMS:
 drivers = [Driver(i) for i in range(0, 3)]
 
 # Festlegen der Namen der Fahrer
-drivers[0].name = "Rot "
-drivers[1].name = "Gelb"
-drivers[2].name = "Blau"
+drivers[0].name = "rot "
+drivers[1].name = "gelb"
+drivers[2].name = "blau"
 
 rms = RMS()
 
@@ -91,63 +92,127 @@ def position():
 
     rms.not_first_round = True
 
-while False:
-    data = cu.poll()
-
-    if isinstance(data, ControlUnit.Timer):
-        os.system('clear')
+def menu_footer(stdscr, zeiten_win, statistik_win, warten=False):
+    try:
+        key = stdscr.getch()
+    except:
+        key = None
+    
+    if key == ord(" "):
+        cu.start()
+    elif key == ord("r"):
+        cu.reset()
+        for zeiten in rms.zeiten_sortiert:
+            drivers[zeiten[0]].reset()
         
-        address = data.address
-        drivers[address].zeit(data)
+        zeiten_win.clear()
+        statistik_win.clear()
+        zeiten_win.refresh()
+        statistik_win.refresh()
+        cu.start()
+    elif key == ord("q"):
+        quit()
 
-        position()
-        #print("zeiten:" + str(rms.zeiten))
-        # print("sortiert:" + str(rms.zeiten_sortiert))
-        # print("ergebnis: " + str(rms.ergebnis))
-        #print("sortiert:" + str(rms.ergebnis))
+
+def rennen_standard(stdscr, zeiten_win, statistik_win, text_farben):
+    
+    warten_auf_bestaetigung = True
+    rennen_offen = True
+    frage = "Wie viele Runden?"
+    max_runden = ""
+
+    while warten_auf_bestaetigung: 
+        zeiten_win.clear()
+        zeiten_win.addstr(f"{frage}")
+        zeiten_win.addstr(3, 0, "Eingabe mit (o) bestätigen", curses.A_ITALIC)
+        zeiten_win.addstr(2, 0, f"Anzahl: {max_runden}")
         
-        #for i in range(0, 3):
-            #print("Position " + str(i) + ": " + str(drivers[i].position))
-        #print("Runden:" + str(rms.laps))
-        #print("Runden:" + str(rms.times))
-        #print("Fuehrender:" + str(rms.first))
-
-        auto_symbol = "o=o/"
-        vorhandene_zeiten = len(rms.zeiten_sortiert)
+        zeiten_win.refresh()
         
-        if vorhandene_zeiten > 0:
-            print (Back.WHITE +      "         Runde: " + str(rms.zeiten_sortiert[0][1]) + "                            ")
-            print (Style.RESET_ALL + "_____________________________________________")
-            for i in range(vorhandene_zeiten):
-                platz = str(i + 1) + ": "
-                farbe = (Fore.RED, Fore.YELLOW, Fore.BLUE)
-                farbe = farbe[rms.zeiten_sortiert[i][0]]
-                
-                if i == 0:
-                    zeit_block = str(rms.zeiten_sortiert[i][2])
-                else:
-                    if rms.zeiten_sortiert[i][1] == rms.zeiten_sortiert[0][1]:
-                        diff_zeit = rms.zeiten_sortiert[0][2] - rms.zeiten_sortiert[i][2]
-                        zeit_block = "+ " + str(round(diff_zeit, 2)) + "sec"
-                    else:
-                        diff_lap = rms.zeiten_sortiert[0][1] - rms.zeiten_sortiert[i][1]
-                        zeit_block = "+ " + str(diff_lap) + " lap"
-                print (farbe + platz + auto_symbol + "               " + zeit_block)
+        key = zeiten_win.getkey()
 
-            print ("")
-            print (Fore.WHITE + "_____________________________________________")
-            print ("Runden:     " + str(str(round(rms.zeiten_sortiert[0][1], 2))))
-            print ("Gesamtzeit: " + str(str(round(rms.zeiten_sortiert[0][2], 2))))
-            print ("_____________________________________________")
+        if key == "o":
+            try:
+                max_runden = int(max_runden)
+                warten_auf_bestaetigung = False
+                zeiten_win.clear()
+                zeiten_win.addstr(4, 1, "Rennen mit Leertaste starten")
+                cu.start()
+                zeiten_win.refresh()
+            except:
+                max_runden = ""
+                frage = "Ungültige Eingabe"
+                zeiten_win.clear()
+                zeiten_win.addstr(f"{frage}")
+                zeiten_win.addstr(2, 0, f"Anzahl: {max_runden}")
+                zeiten_win.refresh()
 
-            print ("Fahrer        Fastest Lap       Rounds")
-            for driver in drivers:
-                if driver.lap > 0:
-                    print(driver.name + "              " + f'{round(driver.bestlap, 2):.2f}' + "             " + str(driver.lap))
+            
         else:
-            print (Back.WHITE +      "         Runde: 0 - Rennen gestartet!        ")
-            print (Style.RESET_ALL + "_____________________________________________")
+            max_runden = max_runden + key
+        
+    
+    stdscr.nodelay(True)
 
+    while rennen_offen:
+
+        daten = daten_auslesen()
+        
+        if len(rms.zeiten_sortiert) > 0 and daten:
+            zeiten_win.clear()
+            position = 1
+
+            zeiten_win.addstr(1, 2, "Pos.")
+            zeiten_win.addstr(1, 8, "Driver")
+            zeiten_win.addstr(1, 18, "Lap")
+            zeiten_win.addstr(1, 26, "Time")
+
+            zeiten_win.hline(2, 2, "=", 30)
+
+            for zeiten in rms.zeiten_sortiert:
+                fahrer = drivers[zeiten[0]].name
+                fahrer_id = zeiten[0]
+                runden = zeiten[1]
+                gesamtzeit = round(zeiten[2], 2)
+                zeiten_win.addstr(position + 2, 3, f"{position}", text_farben[fahrer_id])
+                zeiten_win.addstr(position + 2, 8, f"{fahrer}", text_farben[fahrer_id])
+                zeiten_win.addstr(position + 2, 19, f"{runden}", text_farben[fahrer_id])
+                zeiten_win.addstr(position + 2, 26, f"{gesamtzeit}", text_farben[fahrer_id])
+                position += 1
+            zeiten_win.refresh()
+            
+            #statistik_win.clear()
+            statistik_win.addstr(1, 1, "Driver")
+            statistik_win.addstr(1, 10, "Last")
+            statistik_win.addstr(1, 18, "Fastest")
+            statistik_win.hline(2, 1, "=", 25)
+
+            position = 1
+            for zeiten in rms.zeiten_sortiert:
+                fahrer = drivers[zeiten[0]].name
+                fahrer_id = zeiten[0]
+                
+                zeit_last_lap = round(drivers[zeiten[0]].lap_time, 2)
+                zeit_fastest_lap = round(drivers[zeiten[0]].bestlap, 2)
+                statistik_win.addstr(position + 2, 1, f"{fahrer}", text_farben[fahrer_id])
+                statistik_win.addstr(position + 2, 10, f"{zeit_last_lap}", text_farben[fahrer_id])
+                statistik_win.addstr(position + 2, 20, f"{zeit_fastest_lap}", text_farben[fahrer_id])
+                position += 1
+
+            statistik_win.refresh()
+
+            for zeiten in rms.zeiten_sortiert:
+                rennen_offen = False
+                runden = zeiten[1]
+                if runden < max_runden:
+                    rennen_offen = True
+
+        menu_footer(stdscr=stdscr, zeiten_win=zeiten_win, statistik_win=statistik_win)
+        
+
+    stdscr.nodelay(False)
+    stdscr.addstr(3, 1, "Rennen beendet")
+    menu_footer(stdscr=stdscr, zeiten_win=zeiten_win, statistik_win=statistik_win)
 
 def daten_auslesen ():
     data = cu.poll()
@@ -159,47 +224,51 @@ def daten_auslesen ():
         drivers[address].zeit(data)
 
         position()
+        return True
+    else:
+        return False
 
 def main(stdscr):
+    cu.reset()
     stdscr.clear()
-    stdscr.nodelay(True)
-    stdscr.addstr("hallo")
+    stdscr.refresh()
 
-    while True:
-        daten_auslesen()
-        
-        if len(rms.zeiten_sortiert) > 0:
-            stdscr.clear()
-            position = 1
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
+    text_farben = [
+        curses.color_pair(1), 
+        curses.color_pair(2),
+        curses.color_pair(3)
+    ]
 
-            row_zeiten = 2
+    header_win = curses.newwin(1, 100, 1, 3)
+    zeiten_win = curses.newwin(10, 32, 3, 3)
+    statistik_win = curses.newwin(10, 32, 3, 50)
+    footer_win = curses.newwin(1, 100, 15, 3)
 
-            stdscr.addstr(row_zeiten, 3, "Pos.")
-            stdscr.addstr(row_zeiten, 8, "Driver")
-            stdscr.addstr(row_zeiten, 14, "Lap")
-            stdscr.addstr(row_zeiten, 20, "Time")
-            
-            for zeiten in rms.zeiten_sortiert:
-                fahrer = drivers[zeiten[0]].name
-                runden = zeiten[1]
-                gesamtzeit = round(zeiten[2], 2)
-                stdscr.addstr(row_zeiten + position, 4, f"{position}")
-                stdscr.addstr(row_zeiten + position, 8, f"{fahrer}")
-                stdscr.addstr(row_zeiten + position, 15, f"{runden}")
-                stdscr.addstr(row_zeiten + position, 20, f"{gesamtzeit}")
-                position += 1
-            stdscr.refresh()
-            
+    stdscr.refresh()
+    
+    header_win.clear()
+    header_win.addstr("Goglsche Race-Management-System", curses.A_REVERSE)
+    header_win.refresh()
 
-        try:
-            key = stdscr.getkey()
-        except:
-            key = None
-        
-        if key == "s":
-            cu.start()
-        elif key == "q":
-            quit()
+    footer_win.clear()
+    footer_win.addstr("Drücke (q) zum Beenden, (Leertaste) für Start, (r) für Reset")
+    footer_win.refresh()
+
+    zeiten_win.clear()
+    zeiten_win.addstr("Hauptmenü:")
+    zeiten_win.addstr(3, 1, "1 - Standard Rennen")
+    zeiten_win.refresh()
+
+    key = stdscr.getch()
+
+    if key == ord("1"):
+        rennen_standard(stdscr=stdscr, zeiten_win=zeiten_win, statistik_win=statistik_win, text_farben=text_farben)
+    elif key == ord("q"):
+        quit() 
+
 
 
 wrapper(main)
