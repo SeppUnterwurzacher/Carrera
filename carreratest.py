@@ -62,12 +62,13 @@ class RMS:
     
 
 
-drivers = [Driver(i) for i in range(0, 3)]
+drivers = [Driver(i) for i in range(0, 4)]
 
 # Festlegen der Namen der Fahrer
 drivers[0].name = "rot "
 drivers[1].name = "gelb"
 drivers[2].name = "blau"
+drivers[3].name = "bull"
 
 rms = RMS()
 
@@ -109,7 +110,7 @@ def menu_footer(stdscr, zeiten_win, statistik_win, warten=False):
         statistik_win.clear()
         zeiten_win.refresh()
         statistik_win.refresh()
-        cu.start()
+        #cu.start()
     elif key == ord("q"):
         quit()
 
@@ -202,10 +203,11 @@ def rennen_standard(stdscr, zeiten_win, statistik_win, text_farben):
             statistik_win.refresh()
 
             for zeiten in rms.zeiten_sortiert:
-                rennen_offen = False
+                #rennen_offen = False
                 runden = zeiten[1]
-                if runden < max_runden:
-                    rennen_offen = True
+                if runden >= max_runden:
+                    rennen_offen = False
+                    cu.start()
 
         menu_footer(stdscr=stdscr, zeiten_win=zeiten_win, statistik_win=statistik_win)
         
@@ -229,45 +231,48 @@ def daten_auslesen ():
         return False
 
 def main(stdscr):
-    cu.reset()
-    stdscr.clear()
-    stdscr.refresh()
+    while True:
+        cu.reset()
+        stdscr.clear()
+        stdscr.refresh()
 
-    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
-    curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
-    text_farben = [
-        curses.color_pair(1), 
-        curses.color_pair(2),
-        curses.color_pair(3)
-    ]
+        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+        curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
+        curses.init_pair(4, curses.COLOR_GREEN, curses.COLOR_BLACK)
+        text_farben = [
+            curses.color_pair(1), 
+            curses.color_pair(2),
+            curses.color_pair(3),
+            curses.color_pair(4)
+        ]
 
-    header_win = curses.newwin(1, 100, 1, 3)
-    zeiten_win = curses.newwin(10, 32, 3, 3)
-    statistik_win = curses.newwin(10, 32, 3, 50)
-    footer_win = curses.newwin(1, 100, 15, 3)
+        header_win = curses.newwin(1, 100, 1, 3)
+        zeiten_win = curses.newwin(10, 32, 3, 3)
+        statistik_win = curses.newwin(10, 32, 3, 50)
+        footer_win = curses.newwin(1, 100, 15, 3)
 
-    stdscr.refresh()
-    
-    header_win.clear()
-    header_win.addstr("Goglsche Race-Management-System", curses.A_REVERSE)
-    header_win.refresh()
+        stdscr.refresh()
+        
+        header_win.clear()
+        header_win.addstr("Goglsche Race-Management-System", curses.A_REVERSE)
+        header_win.refresh()
 
-    footer_win.clear()
-    footer_win.addstr("Drücke (q) zum Beenden, (Leertaste) für Start, (r) für Reset")
-    footer_win.refresh()
+        footer_win.clear()
+        footer_win.addstr("Drücke (q) zum Beenden, (Leertaste) für Start, (r) für Reset")
+        footer_win.refresh()
 
-    zeiten_win.clear()
-    zeiten_win.addstr("Hauptmenü:")
-    zeiten_win.addstr(3, 1, "1 - Standard Rennen")
-    zeiten_win.refresh()
+        zeiten_win.clear()
+        zeiten_win.addstr("Hauptmenü:")
+        zeiten_win.addstr(3, 1, "1 - Standard Rennen")
+        zeiten_win.refresh()
 
-    key = stdscr.getch()
+        key = stdscr.getch()
 
-    if key == ord("1"):
-        rennen_standard(stdscr=stdscr, zeiten_win=zeiten_win, statistik_win=statistik_win, text_farben=text_farben)
-    elif key == ord("q"):
-        quit() 
+        if key == ord("1"):
+            rennen_standard(stdscr=stdscr, zeiten_win=zeiten_win, statistik_win=statistik_win, text_farben=text_farben)
+        elif key == ord("q"):
+            quit() 
 
 
 
